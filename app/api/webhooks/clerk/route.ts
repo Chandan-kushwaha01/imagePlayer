@@ -7,7 +7,7 @@ import { Webhook } from "svix";
 
 import { createUser, deleteUser, updateUser } from "@/lib/actions/user.actions";
 
-export async function POST(req) {
+export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
@@ -15,7 +15,6 @@ export async function POST(req) {
     return new Response("Server misconfiguration", { status: 500 });
   }
 
-  // Get svix headers
   const headerPayload = headers();
   const svix_id = headerPayload.get("svix-id");
   const svix_timestamp = headerPayload.get("svix-timestamp");
@@ -25,12 +24,9 @@ export async function POST(req) {
     return new Response("Missing svix headers", { status: 400 });
   }
 
-  // ✅ Get raw body (DO NOT use req.json())
   const body = await req.text();
-
-  // Verify signature
   const wh = new Webhook(WEBHOOK_SECRET);
-  let evt;
+  let evt: WebhookEvent;
 
   try {
     evt = wh.verify(body, {
@@ -43,12 +39,10 @@ export async function POST(req) {
     return new Response("Invalid signature", { status: 400 });
   }
 
-  // Get data + type
   const eventType = evt.type;
   const data = evt.data;
 
   try {
-    // ✅ CREATE
     if (eventType === "user.created") {
       const { id, email_addresses, image_url, first_name, last_name, username } = data;
 
@@ -72,7 +66,6 @@ export async function POST(req) {
       return NextResponse.json({ message: "User created", user: newUser });
     }
 
-    // ✅ UPDATE
     if (eventType === "user.updated") {
       const { id, image_url, first_name, last_name, username } = data;
 
@@ -84,20 +77,15 @@ export async function POST(req) {
       };
 
       const updatedUser = await updateUser(id, user);
-
       return NextResponse.json({ message: "User updated", user: updatedUser });
     }
 
-    // ✅ DELETE
     if (eventType === "user.deleted") {
       const { id } = data;
-
       const deletedUser = await deleteUser(id);
-
       return NextResponse.json({ message: "User deleted", user: deletedUser });
     }
 
-    // ✅ For any unknown event, acknowledge
     console.log(`Unhandled Clerk event: ${eventType}`);
     return new Response("Event received", { status: 200 });
 
